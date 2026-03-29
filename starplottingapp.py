@@ -63,7 +63,7 @@ def starlookup():
 # Popup window to add a new location to the local observer_list.csv
 def coordsentrywin():
     locationentrywindow = tk.Toplevel(root)
-    locationentrywindow.geometry("650x200")
+    locationentrywindow.geometry("1050x200")
     locationentrywindow.title("Add location")
     root.resizable(False, False)
     
