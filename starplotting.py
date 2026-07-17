@@ -1,77 +1,107 @@
-import matplotlib.pyplot as plt
 import numpy as np
 from astropy import units as u
-from astropy.coordinates import AltAz, EarthLocation, SkyCoord, get_body, get_sun, Angle
+from astropy.coordinates import AltAz, EarthLocation, SkyCoord, get_sun, Angle
 from astropy.time import Time
 from astropy.visualization import quantity_support
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.ticker import FormatStrFormatter
+from matplotlib.ticker import FuncFormatter
 
 def starplotting(ax, canvas, star_names, star_coords, observer_coords, observer_date, plot_axes):
-    # Get target from name lookup. Use exact coords if lookup fails
-    # star_name = "M77"
-    # star = SkyCoord.from_name(star_name)
-    # m33 = SkyCoord(23.46206906, 30.66017511, unit="deg")
+    """
+    Plots the altitude or parallactic angle of multiple stars over a night for a given observer location and date.
     
-    
-    # Get the coords of the observatory or location observing from. 
-    observer = EarthLocation(lat=float(observer_coords[0][1]) * u.deg, lon=float(observer_coords[0][2]) * u.deg, height=float(observer_coords[0][3]) * u.m)
-    utcoffset = -7 * u.hour  # MST
-    lstoffset = 0
+    Parameters:
+        ax          : matplotlib Axes object
+        canvas      : FigureCanvasTkAgg canvas to draw
+        star_names  : list of star names
+        star_coords : list of SkyCoord objects corresponding to star_names
+        observer_coords: [[name, lat, lon, elevation]] 
+        observer_date  : string "YYYY-MM-DD"
+        plot_axes   : [x-axis choice, y-axis choice] (0=delta_midnight/UTC), (0=alt, 1=parallactic angle)
+    """
 
-    # Midnight at locations time
-    midnight = Time(observer_date + " 00:00:00") - utcoffset  
+    # ------------------------
+    # Observer location and times
+    observer = EarthLocation(
+        lat=float(observer_coords[0][1]) * u.deg,
+        lon=float(observer_coords[0][2]) * u.deg,
+        height=float(observer_coords[0][3]) * u.m
+    )
+    
+    linspace_size = 6000
+    delta_midnight = np.linspace(-23, 23, linspace_size) * u.hour
+    times = Time(observer_date + " 00:00:00") + delta_midnight
     midnight_ut = Time(observer_date + " 00:00:00")
-    
-    # Get alt/az for 100 points centered around midnight
-    # frame_night = AltAz(obstime=midnight + delta_midnight, location=observer)
-    # staraltazs_night = star.transform_to(frame_night)
-    
-    # Converting to airmass
-    # starairmasss_night = staraltazs_night.secz
-    
-    # Plot airmass
-    # with quantity_support():
-    #     fig, ax = plt.subplots(1, 1, figsize=(12, 6))
-    #     ax.plot(delta_midnight, starairmasss_night)
-    #     ax.set_xlim(-2, 10)
-    #     ax.set_ylim(1, 4)
-    #     ax.set_xlabel("Hours from EDT Midnight")
-    #     ax.set_ylabel("Airmass [Sec(z)]")
-    #     plt.draw()
-    
+    frame = AltAz(obstime=times, location=observer)
+
+    # ------------------------
+    # Compute altitudes and parallactic angles
+    allstar_altaz = []  # List for altitude plotting
+    pa_list = []        # List for parallactic angle plotting
+    allstar_frames = [] # List to store unaltered frames for airmass calcing
+
+    lst = times.sidereal_time('apparent', longitude=observer.lon)
+
+    for star in star_coords:
+        altaz = star.transform_to(frame)
+        allstar_altaz.append(altaz.alt)
+        allstar_frames.append(altaz) # To be used to calc airmass if selected
+        
+        ha = (lst - star.ra).wrap_at(180 * u.deg)
+        
+        # Need radians for proper parallactic angle calc
+        lat_rad = observer.lat.to(u.rad)
+        dec_rad = star.dec.to(u.rad)
+        ha_rad  = ha.to(u.rad)
+        
+        # Parallactic angle calc
+        pa_calc = np.arctan2(
+                np.sin(ha_rad),
+                np.tan(lat_rad) * np.cos(dec_rad) - np.sin(dec_rad) * np.cos(ha_rad)
+                )
+        pa_list.append(Angle(pa_calc).to(u.deg))
+
+    # ------------------------
+    # Sun altitude for shading night
+    sun_altaz = get_sun(times).transform_to(frame)
+
+    # ------------------------
+    # Prepare x and y axes
+    if plot_axes[0] == 0:
+        xaxis = delta_midnight
+        xlabel = "UTC"
+    else:
+        # Finally found my issue. Need to unwrap the lst for calcing the x-limits later
+        lst_unwrapped = np.unwrap(lst.hour, period=24)
+        xaxis = lst_unwrapped * u.hour
+        xlabel = "Local Sidereal Time (hours)"
+ 
+    if plot_axes[1] == 0:
+        yaxis = allstar_altaz
+        ylabel = "Altitude [deg]"
+    elif plot_axes[1] == 1:
+        yaxis = pa_list
+        ylabel = "Parallactic Angle [deg]"
+    elif plot_axes[1] == 2:
+        # Convert altitude to airmass
+        starairmasss_night = []
+        for alt in allstar_frames:
+            starairmasss_night.append(alt.secz)
+        yaxis = starairmasss_night
+        ylabel = "Airmass"
+    #--------------------------------------------------------------------------------------------
+
+    # Plot centering 
+    # Get sun times for use in creating visuals
+    sunaltazs = get_sun(times).transform_to(frame)
     
     # Find alt/az on certain date
-    linspace_size = 4000
     delta_midnight = np.linspace(-23, 23, linspace_size) * u.hour
     times = midnight_ut + delta_midnight
     frame = AltAz(obstime=times, location=observer)
     
-
-    
-    # Bringing in the list of stars instead of just one
-    allstaraltaz = []
-    for i in range(len(star_names)):
-        allstaraltaz.append(star_coords[i].transform_to(frame))
-        allstaraltaz[i] = allstaraltaz[i].alt
-    
-    # Get sun times for use in creating visuals
-    sunaltazs = get_sun(times).transform_to(frame)
-
-
-    # Overwrite for the x axis tick labels to be in 24h time instead of -12 to 12
-    xlabels = (np.arange(13) * 2 - 12)
-    for x in range(len(xlabels)):
-        if xlabels[x] < 0:
-            xlabels[x] += 24
-    # xlabels *= u.hour
-
-#--------------------------------------------------------------------------------------------
-
-    # Plot centering
     # Finding the delta_midnight indexes where the sun crosses the horizon
     sun_below = sunaltazs.alt < 0 * u.deg
-    crossings = np.where(np.diff(sun_below.astype(int)) != 0)[0] #idk what this is doing but it works
+    crossings = np.where(np.diff(sun_below.astype(int)) != 0)[0] #idk what this is doing but I copied it and works
     
         
     # Getting the sunset indexes for delta_midnight specifically
@@ -89,164 +119,96 @@ def starplotting(ax, canvas, star_names, star_coords, observer_coords, observer_
     # Indexes for delta_midnight
     sunset = sunset_closest_diff_index 
     sunrise = crossings[(y * 2) + 1]
- 
-#--------------------------------------------------------------------------------------------
 
-    # Calculating parallactic angle   
-    # Starting with getting lst to then get hour angle. Can use this for the plot later
-    pa = []
-    for i in range(len(star_names)):
-        lst = times.sidereal_time('apparent', longitude=observer.lon)
-        ha = (lst - star_coords[i].ra).wrap_at(180 * u.deg)
-        star_dec = star_coords[i].dec
+    # ------------------------
+    # Clear previous plot
+    ax.clear()
+    quantity_support()  
+    # -------------------------
+
+    # Recreate the annot after clearing
+    ax.annot = ax.annotate("", xy=(0,0), xytext=(8,8), textcoords="offset points",
+                           bbox=dict(boxstyle="round", fc="white", alpha=0.9),
+                           annotation_clip=False
+    )
+    ax.annot.set_visible(False)
+    
+    # Recreate the cursor line after clearing
+    ax.cursor_line = ax.axvline(color='red', linestyle='--', alpha=0.5)
+    ax.cursor_line.set_visible(False)
+    
+    # Array for each star
+    ax.hover_lines = []
+    
+    # Array for hover-over points
+    scatter_points = []  
+
+    # Setting up the probe for finding the values of which point is under the cursor
+    for i, name in enumerate(star_names):
+        line, = ax.plot(xaxis, yaxis[i], label=name)
+        ax.hover_lines.append((line, name))
+        # Add a few scatter points for hover (every 10th point)
+        scatter = ax.scatter(xaxis[::10], yaxis[i][::10], s=50, alpha=0)
+        scatter_points.append((scatter, name))
+    #------------------------
+    # Set up a second ax.annotate to hold the annotation box when frozen
+    ax.frozen_annot = ax.annotate("", xy=(0, 0), xytext=(10, 10), textcoords="offset points",
+                                  bbox=dict(boxstyle="round", fc="lightyellow", alpha=0.9), 
+                                  annotation_clip=False)
+    ax.frozen_annot.set_visible(False)
+
+
+    # ------------------------
+    # Shade night and twilight
+    # For airmass need to have a fill that doesn't use degrees
+    if plot_axes[1] == 2:
+        fill_top = 100
+        fill_bottom = -100
+    else:
+        fill_top = 180*u.deg
+        fill_bottom = -180*u.deg
         
-        # Getting pa. The initial calculation returns radians which I want to be converted to degrees
-        # I used the equation: q = arctan2(sin(H), tan(φ)·cos(δ) − sin(δ)·cos(H)). Sure hope it's correct
-        pa_calc = np.arctan2(np.sin(ha), np.tan(observer.lat) * np.cos(star_dec) - np.sin(star_dec) * np.cos(ha))
-        pa.append(Angle(pa_calc).to(u.deg))
-
-
-#--------------------------------------------------------------------------------------------
-      
-    # Setting the axes
-    # x-axis
-    if plot_axes[0] == 0:
-        xaxis = delta_midnight
-    elif plot_axes[0] == 1:
-        xaxis = lst
-    elif plot_axes[0] == 2:
-        xaxis = delta_midnight # Need to add local time later (maybe)
+    ax.fill_between(xaxis, fill_bottom, fill_top, sun_altaz.alt < 0*u.deg, color="0.5", zorder=0)
+    ax.fill_between(xaxis, fill_bottom, fill_top, sun_altaz.alt < -18*u.deg, color="k", zorder=0)
+    
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    # x-limits based on selection
+    ax.set_xlim(xaxis[sunset] - (1 * u.hour), xaxis[sunrise] + (1 * u.hour))
+    # Need to unwrap the lst after the limits are calcs. Will just change the numbers to be modulated to 24
+    def lst_wrap_formatter(x, pos):
+        # Format the new number as the modulo of x (all ticks), trunkated to have 0 decimals
+        return f"{x % 24:.0f}"
+    if plot_axes[0] == 1:
+        # Apply the format to all ticks
+        ax.xaxis.set_major_formatter(FuncFormatter(lst_wrap_formatter))
         
-    # y-axis
+        
+    
+    # y-limitss based on selection
     if plot_axes[1] == 0:
-        yaxis = allstaraltaz
+        ax.set_ylim(0, 90)
     elif plot_axes[1] == 1:
-        yaxis = pa
+        ax.set_ylim(-180, 180)
     elif plot_axes[1] == 2:
-        yaxis = allstaraltaz # Will add airmass later
+        ax.set_ylim(0, 4)
+    ax.legend()
+    ax.grid(True)
+
+    # Marker to expand the point being shown
+    ax.hover_markers = []
     
-    
-    # Plot target height over the night
-    with quantity_support():
-        # fig, ax = plt.subplots(1, 1, figsize=(12, 6))
-        ax.clear()
-        
-        for x in range(len(allstaraltaz)):
-            mappable = ax.scatter(                
-                # delta_midnight,
-                xaxis,
-                # allstaraltaz[x].alt,
-                # pa,
-                yaxis[x],
-                # c=allstaraltaz[x].az.value,
-                label = star_names[x],
-                lw=0,
-                s=8,
-                # cmap="viridis",
-            )
-        
-#--------------------------------------------------------------------------------------------
-        # Trying to rewrite the x labels to be scalable if I want to zoom to plot bounds
-        midnight_local = Time(observer_date + " 00:00:00")
-        # times_diff = ((times - midnight).sec) / 3600
-       
-            
-        # Get current x limits
-        # ax.set_xlim(-12 * u.hour, 12 * u.hour)
-        # ax.set_xlim(twilight_start_time, twilight_end_time)
-        tick_spacing = 2 * u.hour
-        xmin, xmax = ax.get_xlim()
-        
-        # Convert to Quantity
-        xmin = xmin * u.hour
-        xmax = xmax * u.hour
-        
-        # Build tick positions dynamically
-        ticks = np.arange(
-            np.ceil(xmin.value / tick_spacing.value) * tick_spacing.value,
-            xmax.value + tick_spacing.value,
-            tick_spacing.value,
-        ) # * u.hour
-        
-        ax.set_xticks(ticks * u.hour)
-        
-        # Convert delta_midnight offsets into actual clock times
-        # tick_times = (midnight_local) + ticks 
-        # tick_labels = tick_times.datetime
-        
-        # for t in range(len(tick_labels)):
-            # tick_labels[t].datetime.hour
-        ax.set_xticklabels(ticks)
-        ax.xaxis.set_major_formatter(FormatStrFormatter('%d'))
-#--------------------------------------------------------------------------------------------        
+    # Create the hover circle for all the stars
+    for i in star_names:
+        m = ax.scatter([], [], s=70, color='yellow', edgecolor='black', zorder=10)
+        m.set_visible(False)
+        ax.hover_markers.append(m)
+    # ------------------------
+    # Store for hover
+    ax.scatter_points = scatter_points
+    ax.star_names = star_names
 
-#--------------------------------------------------------------------------------------------
-
-
-        # full night fill
-        ax.fill_between(
-            delta_midnight,
-            -90 * u.deg,
-            90 * u.deg,
-            sunaltazs.alt < (-0 * u.deg),
-            color="0.5",
-            zorder=0,
-        )
-        # 18 deg twilight fill
-        ax.fill_between(
-            delta_midnight,
-            -90 * u.deg,
-            90 * u.deg,
-            sunaltazs.alt < (-18 * u.deg),
-            color="k",
-            zorder=0,
-        )
-        # fig.colorbar(mappable).set_label("Azimuth [deg]")
-        ax.legend(loc="upper left")
-        # ax.set_xlim(-24 * u.hour, 24 * u.hour)
-        ax.set_xlim(delta_midnight[sunset] - (1 * u.hour), delta_midnight[sunrise] + (1 * u.hour))
-        # ax.set_xlim(0.3170792698174552 * u.hour, 14.659664916229055 * u.hour)
-        # ax.set_xticks((np.arange(13) * 2 - 12) * u.hour)
-        ax.set_ylim(-90 * u.deg, 90 * u.deg)
-        ax.set_xlabel("UT (h)")
-        ax.set_ylabel("Altitude [deg]")
-        ax.grid(visible=True)
-        # plt.xlim(-8 * u.hour, 8 * u.hour)
-        # plt.draw()
-        canvas.draw()
-
-
-
-
-
-
-# Testing def
-
-# import csv
-# from matplotlib.figure import Figure
-# from tkinter import ttk, Button, Label, Entry, Frame, Checkbutton
-# import tkinter as tk  
-
-# root = tk.Tk()
-# root.geometry("1000x600")
-# root.title("Star lookup")
-
-# star_names = "M77"
-# star_coords = SkyCoord.from_name(star_names)
-# with open('observer_list.csv', newline='') as csvfile:
-#     observer_locations = list(csv.reader(csvfile))
-    
-# observer_coords = []
-# observer_coords.append(observer_locations[0])
-# observer_date = "2026" + '-' + "02" + '-' + "19"
-
-# fig = Figure()
-# ax = fig.add_subplot(111)
-# canvas = FigureCanvasTkAgg(fig, root)
-# canvas.get_tk_widget().pack(side='right', anchor='ne')
-# root.mainloop()
-
-# starplotting(ax, canvas, star_names, star_coords, observer_coords, observer_date)
+    canvas.draw()
 
 
 

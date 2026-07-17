@@ -1,23 +1,23 @@
-# import numpy as np
-# import matplotlib.pyplot as plt
+import numpy as np
+import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-# import astropy.units as u
 from astropy.coordinates import SkyCoord
 from tkinter import ttk, Button, Label, Entry, Frame, Checkbutton
 import tkinter as tk  
 from starplotting import starplotting
 import csv
 import datetime, calendar
+from astroquery.simbad import Simbad
 
 # Test imports
 
 # 
 
-# Set starting params and defs ---------------------------------------------------------------
+# Set defs and starting params ---------------------------------------------------------------
 
 root = tk.Tk()
-root.geometry("1000x600")
+root.geometry("1300x500")
 root.title("Star lookup")
 
 # Load premade observatry list
@@ -63,7 +63,7 @@ def starlookup():
 # Popup window to add a new location to the local observer_list.csv
 def coordsentrywin():
     locationentrywindow = tk.Toplevel(root)
-    locationentrywindow.geometry("1050x200")
+    locationentrywindow.geometry("650x200")
     locationentrywindow.title("Add location")
     root.resizable(False, False)
     
@@ -83,12 +83,12 @@ def coordsentrywin():
     long.grid(row=2, column=2)
     el.grid(row=2, column=3)
 
-    Button(locationentrywindow, text="Add location", command=lambda: addlocation(name, lat, long, el)).grid(row=3, column=1)
-
+    Button(locationentrywindow, text="Add location", command=lambda: addlocation(name, lat, long, el, locationentrywindow)).grid(row=3, column=1)
+    
 
 
 # Adding the location data into the csv file
-def addlocation(name, lat, long, el):
+def addlocation(name, lat, long, el, locationentrywindow):
     with open('observer_list.csv', 'a', newline='') as csvfile:
         newlocation = [name.get(), lat.get(), long.get(), el.get()]
         writer = csv.writer(csvfile)
@@ -104,6 +104,8 @@ def addlocation(name, lat, long, el):
     locationnames.append(observer_locations[-1][0])
     dropbox.config(values=locationnames)
     dropbox.current(0)
+    
+    locationentrywindow.destroy()
     
     
 # Selecting the row to omit then rewrite the file without it
@@ -129,14 +131,11 @@ def dellocation():
     del locationnames[dropbox.current()]
     dropbox.config(values=locationnames)
     dropbox.current(0)  
-    
-    
-
-    
+   
     
     
     
-# It prints the current value of the variable.
+# Test is new value is valid, then add to the list and update the gui
 def addentry(event):
         # print(event)
         try: # Testing for valid target name          
@@ -171,9 +170,62 @@ def importtargets():
         starlist = txtfile.readlines()    
     starcheckandlist()
     
-      
+# When the lookup button is hit, reload the lookup. Test def, should prob fold this into simbadlookup()
+def radiobuttonhit():
+    print(radioselect.get())
+    simbadlookup()
 
+# Def to query simbad for all the strs in "votables". Make sure to update "simbadlookups" as well if altering lookups
+def simbadlookup():
+    # Used for setting the row
+    count = 1
+    
+    # Starting the simbad query and clearing incase the previous lookup didn't
+    s = Simbad()
+    s.reset_votable_fields()
+    # Looking up all the votables defined by the tuple. Have to use * to seperate each entry
+    s.add_votable_fields(*votables)
+    # Get the details of the currently selected target and set it to a variable
+    simbadquery = s.query_object(radioselect.get())
+    
+    votablesdict["target"].config(text=radioselect.get())
+    for votable in votables:
+        count += 1
+        # Fill out entries in order of votables tuple. Converting to str and using the last line which gives the wanted value
+        votablesdict[votable].config(text=str(simbadquery[votable]).split("\n")[-1]) # = Label(simbadinfoframe, text=str(simbadquery[votable]).split("\n")[-1]).grid(row=count, column=1)
+        # For cases empty info, state why that is
+        if simbadquery[votable] == "":
+            # votablesdict[votable] = Label(simbadinfoframe, text="Not a star").grid(row=count, column=1)
+            votablesdict[votable].config(text="Not a star")
+        elif str(simbadquery[votable]).split("\n")[-1] == "      --":
+            # Label(simbadinfoframe, text="No data").grid(row=count, column=1)
+            votablesdict[votable].config(text="No data")
        
+        
+# Def for freezeing the hover-over annotation when clicking
+hover_frozen = {"state": False, "x": None, "y": None}   
+ 
+def toggle_freeze(event):
+    if event.inaxes != ax:
+        return
+
+    hover_frozen["state"] = not hover_frozen["state"]
+
+    # If freezing, store current position
+    if hover_frozen["state"]:
+        hover_frozen["x"] = event.xdata
+        hover_frozen["y"] = event.ydata
+
+        # copy current hover text into frozen annotation
+        ax.frozen_annot.set_text(ax.annot.get_text())
+        ax.frozen_annot.xy = (event.xdata, event.ydata)
+        ax.frozen_annot.set_visible(True)
+
+    else:
+        ax.frozen_annot.set_visible(False)
+
+    canvas.draw_idle()
+
 
 # Gui items ----------------------------------------------------------------------------------
 #---------------------------------------------------------------------------------------------
@@ -201,17 +253,24 @@ checkchecklist = {}
 
 
 # Creating frame for the checkboxes and entries to line up beside each other
-
 listframe = Frame(targetlistframe)
 listframe.grid(row=1, column=0, columnspan=2)
-listframe.configure(bg="white")
+# listframe.configure(bg="white")
 starlist = ["M77", "Procyon", "Vega"]
+
+
+# Variable the radiobox uses to determine both it's initial selection and it's output
+radioselect = tk.StringVar(value=starlist[0])
+
 def starcheckandlist():
     # Emptying the frame to repopulate it
     for widget in listframe.winfo_children():
-        widget.destroy()
-    # print("sarcheckandlist run")
-    # if     
+        widget.destroy()    
+    
+    # Making the labels for each column 
+    Label(listframe, text="Display").grid(row=0, column=0)
+    Label(listframe, text="Target", bg=targetlistframe.cget("bg")).grid(row=0, column=1)
+    Label(listframe, text="Info").grid(row=0, column=2)
     
     for i in range(len(starlist)):        
         # Creating the states of the checkboxes. Could be chenged by .ttk version of Checkbutton
@@ -219,17 +278,22 @@ def starcheckandlist():
         
         # Creating checkboxes to match the text entries
         checkdict["checkbox{0}".format(i)] = Checkbutton(listframe, variable=checkchecklist['checkvar'+str(i)])
-        checkdict["checkbox" + str(i)].grid(row=i, column=0)
+        checkdict["checkbox" + str(i)].grid(row=i+1, column=0)
         checkdict["checkbox" + str(i)].configure(bg="white")
         
     
         # Creating and filling out text entries
         targettext = tk.StringVar(value=starlist[i])
         entrydict["entry{0}".format(i)] = Entry(listframe, textvariable=targettext, state="readonly")
-        entrydict["entry" + str(i)].grid(row=i, column=1)              
+        entrydict["entry" + str(i)].grid(row=i+1, column=1)  
+        # entrydict["entry" + str(i)].configure(bg="white")           
         entrydict["entry" + str(i)]["textvariable"] = targettext
         
-    # return check_var, checkdict
+        
+        # Creating linked checkboxes (radiobutton) to choose what target is displaying simbad info
+        # radiobuttonvariable = tk.BooleanVar() #Progably need a list matching the target amount?
+        tk.Radiobutton(listframe, text="", variable=radioselect, value=starlist[i], command=radiobuttonhit).grid(row=i+1, column=2)
+        
 
 
 # Three column frame for checklist buttons
@@ -243,7 +307,7 @@ Button(checklistbuttonsframe, text="Import target list", command=importtargets).
 Button(checklistbuttonsframe, text="Remove item", command=delentry).grid(row=0, column=1, padx=10)
 
 # Button for star lookup
-Button(checklistbuttonsframe, text="Get object coords", command=starlookup).grid(row=0, column=2, padx=10)
+Button(checklistbuttonsframe, text="Plot targets", command=starlookup).grid(row=0, column=2, padx=10)
 
 checklistbuttonsframe.grid(row=2, column=0, columnspan=2)
 
@@ -332,8 +396,8 @@ Label(targetlistframe, text="Y Axis").grid(row=6, column=1)
 
 
 # Dropboxes to choose the axes of the plot
-xaxismodes = ["UTC"] # , "Local", "LST"
-yaxismodes = ["Altitude", "Parallactic angle"] # , "Airmass"
+xaxismodes = ["UTC", "LST"] # , "Local", 
+yaxismodes = ["Altitude", "Parallactic angle", "Airmass"] 
 xaxisdropbox = ttk.Combobox(targetlistframe, values=xaxismodes, state='readonly')
 yaxisdropbox = ttk.Combobox(targetlistframe, values=yaxismodes, state='readonly')
 xaxisdropbox.current(0)
@@ -345,42 +409,138 @@ yaxisdropbox.grid(row=7, column=1)
 
 
 #---------------------------------------------------------------------------------------------
+# Def for generating the annotation and enlarged plot point
+def hover(event):
 
-# Creating the plot to be used later
+    if event.inaxes != ax:
+        ax.annot.set_visible(False)
+        ax.cursor_line.set_visible(False)
+        canvas.draw_idle()
+        return
+
+    # If the plot is clicked to freeze the annotation, wait till clicked again to resume
+    if hover_frozen["state"]:
+        return
+        mouse_x = hover_frozen["x"]
+    else:
+        mouse_x = event.xdata
+
+
+
+    # Array to store the star names and y-value that will be displayed in the annotation
+    text_lines = []
+    
+    # Find the x and y values of each plot, then add them to text_line for the annotation
+    for i, (line, star_name) in enumerate(ax.hover_lines):
+
+        x = np.asarray(line.get_xdata(), dtype=float)
+        y = np.asarray(line.get_ydata(), dtype=float)
+    
+        idx = np.argmin(np.abs(x - mouse_x))
+    
+        # Star name and y-value that will be added to the annotation text
+        text_lines.append(f"{star_name}: {y[idx]:.1f}°")
+    
+        # Move each star’s enlarged marker to their x and y coords and overwrite plot point
+        ax.hover_markers[i].set_offsets([(x[idx], y[idx])])
+        ax.hover_markers[i].set_visible(True)
+
+    # Start the annotation text with the time (x-value) then add all the targets y-values
+    text = (f"{xaxisdropbox.get()} = {(mouse_x % 24):.2f}\n\n" + "\n".join(text_lines))
+    
+
+    ax.annot.set_text(text)
+
+    # Put annotation near top of plot and make it visable
+    ax.annot.xy = (event.xdata, event.ydata)
+    ax.annot.set_visible(True)
+    ax.cursor_line.set_xdata([mouse_x])
+    ax.cursor_line.set_visible(True)
+    
+    canvas.draw_idle()
+
+
+# Creating and placing the plot to be used later
 fig = Figure()
 ax = fig.add_subplot(111)
+
 canvas = FigureCanvasTkAgg(fig, root)
-canvas.get_tk_widget().pack(side='right', anchor='ne')
-# canvas.get_tk_widget().grid(row=6, column=1)
-# canvas.get_tk_widget().place(x=300, y=0)
+canvas.get_tk_widget().pack(side='left', anchor='ne')
+fig.canvas.mpl_connect("motion_notify_event", hover)
 
+
+# Have to make these after "ax" is created
+# Making the hover-over label. This will be recreated when a plot is generated so these values aren't too important
+annot = ax.annotate("", xy=(0,0), xytext=(10,10), textcoords="offset points", bbox=dict(boxstyle="round", fc="w"), annotation_clip=False)
+annot.set_visible(False)
+
+
+# Creating the vertical line for making the hover-over more readable
+ax.cursor_line = ax.axvline(color='red', linestyle='--', alpha=0.5)
+ax.cursor_line.set_visible(False)
+
+
+# Binding clicking to freezing the anootation
+canvas.mpl_connect("button_press_event", toggle_freeze)
+#------------------------------------------------------------------------------
+# Setting up info panel for selected target, starting with a new frame just for the simbad info
+simbadinfoframe = Frame(root)
+
+# Listing the votables that will be looked up from simbad
+simbadlookups = ('RA', 'Dec', 'Object type', 'Spectral type', 'B mag', 'V mag', 'R mag', 'I mag', 'J mag', 'K mag', 'Proper motion RA', 'Proper motion Dec')
+simbadlookupsrow = 2
+votables = ('ra', 'dec', 'otype', 'sp_type', 'B', 'V', 'R', 'I', 'J', 'K', 'pmra', 'pmdec')
+votablesdict = {}
+
+# Starting row stating the name of the target being shown
+Label(simbadinfoframe, text="Target:").grid(row=0, column=0)
+Label(simbadinfoframe, text=radioselect.get()).grid(row=0, column=1)
+
+
+# All the info pulled from simbad
+Label(simbadinfoframe, text="Details:").grid(row=1, column=0, columnspan=2)
+
+for label in simbadlookups:
+    Label(simbadinfoframe, text=label + ":").grid(row=simbadlookupsrow, column=0)
+    simbadlookupsrow += 1
+
+
+# Used for setting the row
+count = 1
+
+# Starting the simbad query and clearing incase the previous lookup didn't
+s = Simbad()
+s.reset_votable_fields()
+# Looking up all the votables defined by the tuple. Have to use * to seperate each entry
+s.add_votable_fields(*votables)
+# Get the details of the currently selected target and set it to a variable
+simbadquery = s.query_object(radioselect.get())
+
+# Display the info of the currently selected target
+# Change the name to the corrently selected target
+   
+# Place the labels for the data from the lookup and putting them into a dict to modify later
+votablesdict["target"] = Label(simbadinfoframe, text=radioselect.get())
+votablesdict["target"].grid(row=0, column=1) 
+for votable in votables:
+    count += 1
+    # Fill out entries in order of votables tuple. Converting to str and using the last line which gives the wanted value
+    votablesdict[votable] = Label(simbadinfoframe, text=str(simbadquery[votable]).split("\n")[-1])
+    votablesdict[votable].grid(row=count, column=1)
+    # For cases empty info, state why that is
+    if simbadquery[votable] == "":
+        # votablesdict[votable] = Label(simbadinfoframe, text="Not a star").grid(row=count, column=1)
+        votablesdict[votable].config(text="Not a star")
+    elif str(simbadquery[votable]).split("\n")[-1] == "      --":
+        # Label(simbadinfoframe, text="No data").grid(row=count, column=1)
+        votablesdict[votable].config(text="No data")
+
+
+# simbadlookup()
+
+simbadinfoframe.pack(side='left', anchor='ne')
 
 #------------------------------------------------------------------------------
-# Setting up the popup window for adding new locations
-# locationentrywindow = tk.Tk()
-# # locationentrywindow.geometry("500x200")
-# locationentrywindow.title("Add location")
-# # locationentrywindow.resizable(False, False)
-
-# Label(locationentrywindow, text="Enter the details of the location you wish to add").grid(row=0, column=1)
-# Label(locationentrywindow, text="Name").grid(row=1, column=0)
-# Label(locationentrywindow, text="Latitude").grid(row=1, column=1)
-# Label(locationentrywindow, text="Longitude").grid(row=1, column=2)
-# Label(locationentrywindow, text="Elevation (m)").grid(row=1, column=3)
-
-# name = Entry(locationentrywindow, textvariable="")
-# lat = Entry(locationentrywindow, textvariable="")
-# long = Entry(locationentrywindow, textvariable="")
-# el = Entry(locationentrywindow, textvariable="")
-
-# name.grid(row=2, column=0)
-# lat.grid(row=2, column=1)
-# long.grid(row=2, column=2)
-# el.grid(row=2, column=3)
-
-# Button(locationentrywindow, text="Add location", command=addlocation).grid(row=3, column=1)
-#------------------------------------------------------------------------------
-
 
 
 
