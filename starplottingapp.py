@@ -167,7 +167,9 @@ def delentry():
 def importtargets():
     global starlist
     with open('target_list.txt', newline='') as txtfile:
-        starlist = txtfile.readlines()    
+        # Strip the lines to remove any artifacts. Without this, if more than the starting three targets were plotted,
+        # there would be a box appearing at the end of the original starlist targets text
+        starlist = [line.strip() for line in txtfile.readlines() if line.strip()]
     starcheckandlist()
     
 # When the lookup button is hit, reload the lookup. Test def, should prob fold this into simbadlookup()
@@ -471,14 +473,17 @@ fig.canvas.mpl_connect("motion_notify_event", hover)
 
 # Have to make these after "ax" is created
 # Making the hover-over label. This will be recreated when a plot is generated so these values aren't too important
-annot = ax.annotate("", xy=(0,0), xytext=(10,10), textcoords="offset points", bbox=dict(boxstyle="round", fc="w"), annotation_clip=False)
-annot.set_visible(False)
+ax.annot = ax.annotate("", xy=(0,0), xytext=(10,10), textcoords="offset points", bbox=dict(boxstyle="round", fc="w"), annotation_clip=False)
+ax.annot.set_visible(False)
 
 
 # Creating the vertical line for making the hover-over more readable
 ax.cursor_line = ax.axvline(color='red', linestyle='--', alpha=0.5)
 ax.cursor_line.set_visible(False)
 
+# Empty arrays to prevet errors of hovering over the plot before the first one is drawn
+ax.hover_lines = []
+ax.hover_markers = []
 
 # Binding clicking to freezing the anootation
 canvas.mpl_connect("button_press_event", toggle_freeze)
