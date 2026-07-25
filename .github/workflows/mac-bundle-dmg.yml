@@ -1,0 +1,36 @@
+name: Build Mac Dmg
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: pip install pyinstaller astropy astroquery pyvo
+      - run: pyinstaller --onefile --windowed --collect-data astroquery --collect-data astropy --collect-data pyvo starplottingapp.py
+      - name: Create DMG
+        run: |
+          mkdir -p dmg_temp
+          cp -R "dist/starplottingapp.app" dmg_temp/
+          ln -s /Applications dmg_temp/Applications
+          hdiutil create -volname "YourAppName" -srcfolder dmg_temp -ov -format UDZO dist/Starplottingapp.dmg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-app
+          path: dist/Starplottingapp.dmg
+
+          
+      - name: Package dmg with folder
+        run: |
+          mkdir release_folder
+          cp dist/Starplottingapp.dmg Starplotting-app/
+          cp config.json Starplotting-app/
+          cp -r icons Starplotting-app/
+          Compress-Archive -Path Starplotting-app\* -DestinationPath dist\Starplottingapp.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-app
+          path: dist/Starplottingapp-mac.zip
