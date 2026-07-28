@@ -15,7 +15,7 @@ jobs:
       - name: Package release folder
         run: |
           mkdir release_folder
-          cp dist/Starplottingapp.dmg release_folder/
+          cp -r "dist/starplottingapp.app" release_folder/
           cp observer_list.csv release_folder/
           cp requirements.txt release_folder/
           cp starplotting.py release_folder/
