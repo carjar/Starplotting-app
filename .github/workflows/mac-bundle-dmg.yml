@@ -11,19 +11,8 @@ jobs:
           python-version: '3.x'
       - run: pip install pyinstaller astropy astroquery pyvo
       - run: pyinstaller --onefile --windowed --collect-data astroquery --collect-data astropy --collect-data pyvo starplottingapp.py
-      - name: Create DMG
-        run: |
-          mkdir -p dmg_temp
-          cp -R "dist/starplottingapp.app" dmg_temp/
-          ln -s /Applications dmg_temp/Applications
-          hdiutil create -volname "YourAppName" -srcfolder dmg_temp -ov -format UDZO dist/Starplottingapp.dmg
-      - uses: actions/upload-artifact@v4
-        with:
-          name: mac-app
-          path: dist/Starplottingapp.dmg
-
-          
-      - name: Package dmg with folder
+      
+      - name: Package release folder
         run: |
           mkdir release_folder
           cp dist/Starplottingapp.dmg release_folder/
@@ -31,8 +20,8 @@ jobs:
           cp requirements.txt release_folder/
           cp starplotting.py release_folder/
           cp target_list.txt release_folder/
-          Compress-Archive -Path release_folder\* -DestinationPath dist\Starplottingapp.zip
+          Compress-Archive -Path release_folder\* -DestinationPath dist\Starplottingapp-mac.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: mac-app
+          name: mac-zip
           path: dist/Starplottingapp-mac.zip
