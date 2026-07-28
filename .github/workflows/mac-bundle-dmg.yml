@@ -27,8 +27,10 @@ jobs:
         run: |
           mkdir release_folder
           cp dist/Starplottingapp.dmg release_folder/
-          cp config.json release_folder/
-          cp -r icons release_folder/
+          cp observer_list.csv release_folder/
+          cp requirements.txt release_folder/
+          cp starplotting.py release_folder/
+          cp target_list.txt release_folder/
           Compress-Archive -Path release_folder\* -DestinationPath dist\Starplottingapp.zip
       - uses: actions/upload-artifact@v4
         with:
