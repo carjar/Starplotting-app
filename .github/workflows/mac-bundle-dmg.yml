@@ -10,7 +10,7 @@ jobs:
         with:
           python-version: '3.x'
       - run: pip install pyinstaller astropy astroquery pyvo
-      - run: pyinstaller --onefile --windowed --collect-data astroquery --collect-data astropy --collect-data pyvo starplottingapp.py
+      - run: pyinstaller --onefile --windowed --target-architecture universal2 --collect-data astroquery --collect-data astropy --collect-data pyvo starplottingapp.py
       
       - name: Package release folder
         run: |
