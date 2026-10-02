@@ -1,3 +1,5 @@
+import sys
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
@@ -16,12 +18,28 @@ from astroquery.simbad import Simbad
 
 # Set defs and starting params ---------------------------------------------------------------
 
+
+# Setting the path for where the editable files are grabbed. Thanks apple for forcing me to do this
+# When a .app (mac .exe) is clicked, the actual binary that is run is three directories deep in whatever.app/Contents/MacOS/
+# So instead, if a mac is detected, move the intended path up to where the .app is
+if sys.platform == 'darwin':
+    app_dir = os.path.abspath(os.path.join(os.path.dirname(sys.executable), '..', '..', '..'))
+else:
+    # Have to make a new path for windows and linux too
+    app_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Setting open() function path
+observer_list_path = os.path.join(app_dir, "observer_list.csv")
+target_list_path = os.path.join(app_dir, "target_list.txt")
+    
+    
+# Setting up the main app window where all other entries will go in
 root = tk.Tk()
 root.geometry("1300x500")
 root.title("Star lookup")
 
 # Load premade observatry list
-with open('observer_list.csv', newline='') as csvfile:
+with open(observer_list_path, newline='') as csvfile:
     observer_locations = list(csv.reader(csvfile))
 
 
@@ -89,14 +107,14 @@ def coordsentrywin():
 
 # Adding the location data into the csv file
 def addlocation(name, lat, long, el, locationentrywindow):
-    with open('observer_list.csv', 'a', newline='') as csvfile:
+    with open(observer_list_path, 'a', newline='') as csvfile:
         newlocation = [name.get(), lat.get(), long.get(), el.get()]
         writer = csv.writer(csvfile)
         writer.writerow(newlocation)
         
     # Update the lists used to send the coords to plotting and fill out the dropdown box respectivly
     global observer_locations
-    with open('observer_list.csv', newline='') as csvfile:
+    with open(observer_list_path, newline='') as csvfile:
         observer_locations = list(csv.reader(csvfile))
       
     # print(observer_locations)
@@ -111,12 +129,12 @@ def addlocation(name, lat, long, el, locationentrywindow):
 # Selecting the row to omit then rewrite the file without it
 def dellocation():   
     # Loading file and putting it in a seperate list
-    with open("observer_list.csv", "r", newline="") as file:
+    with open(observer_list_path, "r", newline="") as file:
         csvrows = list(csv.reader(file))
     del csvrows[dropbox.current()]
     
     # Rewriting file with the seperate list minus the deleted file
-    with open("observer_list.csv", "w", newline="") as rewritecsv:
+    with open(observer_list_path, "w", newline="") as rewritecsv:
         writer = csv.writer(rewritecsv)
         for row in csvrows:
             writer.writerow(row)
@@ -124,7 +142,7 @@ def dellocation():
     
     # Update the lists used to send the coords to plotting and fill out the dropdown box respectivly
     global observer_locations
-    with open('observer_list.csv', newline='') as csvfile:
+    with open(observer_list_path, newline='') as csvfile:
         observer_locations = list(csv.reader(csvfile))
     
     global locationnames
@@ -166,7 +184,7 @@ def delentry():
 # Import a target list from a text file and remake the target list
 def importtargets():
     global starlist
-    with open('target_list.txt', newline='') as txtfile:
+    with open(target_list_path, newline='') as txtfile:
         # Strip the lines to remove any artifacts. Without this, if more than the starting three targets were plotted,
         # there would be a box appearing at the end of the original starlist targets text
         starlist = [line.strip() for line in txtfile.readlines() if line.strip()]
