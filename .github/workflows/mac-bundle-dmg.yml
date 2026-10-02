@@ -20,7 +20,7 @@ jobs:
           cp starplotting.py release_folder/
           cp target_list.txt release_folder/
           cd release_folder
-          zip -r ../dist/Starplottingapp-mac-arm64.zip .
+          zip -r ../dist/Starplottingapp-mac.zip .
       - uses: actions/upload-artifact@v4
         with:
           name: mac-zip
