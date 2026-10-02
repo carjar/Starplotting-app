@@ -31,8 +31,22 @@ else:
 # Setting open() function path
 observer_list_path = os.path.join(app_dir, "observer_list.csv")
 target_list_path = os.path.join(app_dir, "target_list.txt")
+  
+## REMOVE AFTER -----------------------------------------------------------------------------  
+# Testing mac functionality ------------------------------------------------------------------
+# Setting open() function path
+file_path = os.path.join(app_dir, "test_file.txt")
+
+# Open the file in write mode
+with open(file_path, 'w') as file:
+    # Write content to the file
+    file.write("Test if .app is functioning.")
     
-    
+print(f"File '{file_path}' created successfully.")
+# --------------------------------------------------------------------------------------------
+# -------------------------------------------------------------------------------------------
+
+
 # Setting up the main app window where all other entries will go in
 root = tk.Tk()
 root.geometry("1300x500")
