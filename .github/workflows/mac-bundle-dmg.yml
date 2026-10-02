@@ -2,16 +2,15 @@ name: Build Mac folder
 on: workflow_dispatch
 
 jobs:
-  build:
-    runs-on: macos-latest
+  build-arm64:
+    runs-on: macos-latest   # Apple Silicon
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
       - run: pip install pyinstaller astropy astroquery pyvo
-      - run: pyinstaller --onefile --windowed --target-architecture universal2 --collect-data astroquery --collect-data astropy --collect-data pyvo starplottingapp.py
-      
+      - run: pyinstaller --onefile --windowed --collect-data astroquery --collect-data astropy --collect-data pyvo starplottingapp.py
       - name: Package release folder
         run: |
           mkdir release_folder
@@ -21,8 +20,9 @@ jobs:
           cp starplotting.py release_folder/
           cp target_list.txt release_folder/
           cd release_folder
-          zip -r ../dist/Starplottingapp-mac.zip .
+          zip -r ../dist/Starplottingapp-mac-arm64.zip .
       - uses: actions/upload-artifact@v4
         with:
           name: mac-zip
           path: dist/Starplottingapp-mac.zip
+
