@@ -20,9 +20,32 @@ jobs:
           cp starplotting.py release_folder/
           cp target_list.txt release_folder/
           cd release_folder
-          zip -r ../dist/Starplottingapp-mac.zip .
+          zip -r ../dist/Starplottingapp-mac-arm64.zip .
       - uses: actions/upload-artifact@v4
         with:
-          name: mac-zip
-          path: dist/Starplottingapp-mac.zip
+          name: mac-arm64-zip
+          path: dist/Starplottingapp-mac-arm64.zip
 
+  build-intel:
+    runs-on: macos-13   # Intel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: pip install pyinstaller astropy astroquery pyvo
+      - run: pyinstaller --onefile --windowed --collect-data astroquery --collect-data astropy --collect-data pyvo starplottingapp.py
+      - name: Package release folder
+        run: |
+          mkdir release_folder
+          cp -r "dist/starplottingapp.app" release_folder/
+          cp observer_list.csv release_folder/
+          cp requirements.txt release_folder/
+          cp starplotting.py release_folder/
+          cp target_list.txt release_folder/
+          cd release_folder
+          zip -r ../dist/Starplottingapp-mac-intel.zip .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-intel-zip
+          path: dist/Starplottingapp-mac-intel.zip
