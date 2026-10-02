@@ -9,7 +9,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - run: pip install pyinstaller astropy astroquery pyvo
+      - run: pip install pyinstaller matplotlib astropy astroquery pyvo
       - run: pyinstaller --onefile --windowed --collect-data matplotlib --collect-data astroquery --collect-data astropy --collect-data pyvo starplottingapp.py
       - name: Package release folder
         run: |
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - run: pip install pyinstaller astropy astroquery pyvo
+      - run: pip install pyinstaller matplotlib astropy astroquery pyvo
       - run: pyinstaller --onefile --windowed --collect-data matplotlib --collect-data astroquery --collect-data astropy --collect-data pyvo starplottingapp.py
       - name: Package release folder
         run: |
